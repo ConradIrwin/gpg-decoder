@@ -6,6 +6,13 @@ function Stream(bytes, start, end) {
     this.pos = this.start;
 }
 
+function LookupResult(string, id) {
+    this.toString = this.toJSON = function () {
+        return (string || "undefined") + " (0x" + id.toString(16) + ")";
+    };
+    this.id = id;
+}
+
 Stream.prototype = {
     toArray: function () {
         return this.bytes.slice(this.start, this.end);
@@ -65,7 +72,7 @@ Stream.prototype = {
 
     // RFC 4880 3.7.1.3
     iterationCount: function () {
-        var c = this.stream.octet();
+        var c = this.octet();
         return (16 + (c & 15)) << ((c >> 4) + 6);
     },
 
@@ -88,7 +95,6 @@ Stream.prototype = {
         return this.uint32();
     },
 
-    // this could be made more efficient with a bit of care
     subParse: function (n, f) {
         var oldEnd = this.end,
             oldStart = this.start;
@@ -96,7 +102,6 @@ Stream.prototype = {
             this.start = this.pos;
             this.end = this.pos + n;
             f();
-            console.log(this.start, this.pos, this.end, oldStart, oldEnd, n);
             if (this.pos != this.end) {
                 this.pos = this.end;
                 return true;
@@ -109,7 +114,7 @@ Stream.prototype = {
 
     lookup: function (table) {
         var octet = this.octet();
-        return (table[octet] || "undefined") + " (" + octet + ")";
+        return new LookupResult(table[octet], octet);
     },
 
     lookupArray: function (table, n) {
@@ -129,7 +134,7 @@ Stream.prototype = {
 
         for (i = 1; i < Math.pow(2, n * 8); i *= 2) {
             if (flags & i) {
-                results.push((table[i] || "undefined") + " (0x" + i.toString(16) + ")");
+                results.push(new LookupResult(table[i], i));
             }
         }
         return results;

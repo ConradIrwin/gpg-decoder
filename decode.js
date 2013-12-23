@@ -21,10 +21,6 @@ Packet.TAGS = {
     17: "User Attribute Packet",
     18: "Sym. Encrypted and Integrity Protected Data Packet",
     19: "Modification Detection Code Packet",
-    60: "Private or Experimental Values",
-    61: "Private or Experimental Values",
-    62: "Private or Experimental Values",
-    63: "Private or Experimental Values"
 };
 
 Packet.PUBLIC_KEY_ALGORITHMS = {
@@ -37,17 +33,6 @@ Packet.PUBLIC_KEY_ALGORITHMS = {
     19: "Reserved for ECDSA",
     20: "Reserved (formerly Elgamal Encrypt or Sign)",
     21: "Reserved for Diffie-Hellman (X9.42, as defined for IETF-S/MIME)",
-    100: "Private/Experimental algorithm",
-    101: "Private/Experimental algorithm",
-    102: "Private/Experimental algorithm",
-    103: "Private/Experimental algorithm",
-    104: "Private/Experimental algorithm",
-    105: "Private/Experimental algorithm",
-    106: "Private/Experimental algorithm",
-    107: "Private/Experimental algorithm",
-    108: "Private/Experimental algorithm",
-    109: "Private/Experimental algorithm",
-    110: "Private/Experimental algorithm"
 };
 
 Packet.SYMMETRIC_KEY_ALGORITHMS = {
@@ -62,17 +47,6 @@ Packet.SYMMETRIC_KEY_ALGORITHMS = {
     8: "AES with 192-bit key",
     9: "AES with 256-bit key",
     10: "Twofish with 256-bit key",
-    100: "Private/Experimental algorithm",
-    101: "Private/Experimental algorithm",
-    102: "Private/Experimental algorithm",
-    103: "Private/Experimental algorithm",
-    104: "Private/Experimental algorithm",
-    105: "Private/Experimental algorithm",
-    106: "Private/Experimental algorithm",
-    107: "Private/Experimental algorithm",
-    108: "Private/Experimental algorithm",
-    109: "Private/Experimental algorithm",
-    110: "Private/Experimental algorithm"
 };
 
 Packet.COMPRESSION_ALGORITHMS = {
@@ -80,17 +54,6 @@ Packet.COMPRESSION_ALGORITHMS = {
     1: "ZIP",
     2: "ZLIB",
     3: "BZip2",
-    100: "Private/Experimental algorithm",
-    101: "Private/Experimental algorithm",
-    102: "Private/Experimental algorithm",
-    103: "Private/Experimental algorithm",
-    104: "Private/Experimental algorithm",
-    105: "Private/Experimental algorithm",
-    106: "Private/Experimental algorithm",
-    107: "Private/Experimental algorithm",
-    108: "Private/Experimental algorithm",
-    109: "Private/Experimental algorithm",
-    110: "Private/Experimental algorithm"
 };
 
 Packet.HASH_ALGORITHMS = {
@@ -154,17 +117,6 @@ Packet.SIGNATURE_SUBPACKET_TYPES = {
     30: "Features",
     31: "Signature Target",
     32: "Embedded Signature",
-    100: "Private or experimental",
-    101: "Private or experimental",
-    102: "Private or experimental",
-    103: "Private or experimental",
-    104: "Private or experimental",
-    105: "Private or experimental",
-    106: "Private or experimental",
-    107: "Private or experimental",
-    108: "Private or experimental",
-    109: "Private or experimental",
-    110: "Private or experimental"
 };
 
 Packet.KEYSERVER_PREFERENCES = {
@@ -183,6 +135,13 @@ Packet.KEY_FLAGS = {
 
 Packet.KEY_FEATURES = {
     1: 'Modification detection'
+};
+
+Packet.STRING_TO_KEY_SPECIFIERS = {
+    0: "Simple S2K",
+    1: "Salted S2K",
+    2: "Reserved value",
+    3: "Iterated and Salted S2K"
 };
 
 Packet.prototype = {
@@ -254,6 +213,11 @@ Packet.prototype = {
             this.parseSignaturePacket();
             break;
 
+        case 6:
+        case 14:
+            this.parsePublicKeyPacket();
+            break;
+
         case 5:
         case 7:
             this.parseSecretKeyPacket();
@@ -274,13 +238,12 @@ Packet.prototype = {
 
         if (this.version === 3) {
             this.keyId = this.stream.hex(8);
-            this.publicKeyAlgorithmId = this.stream.octet();
-            this.publicKeyAlgorithm = Packet.PUBLIC_KEY_ALGORITHMS[this.publicKeyAlgorithmId];
+            this.publicKeyAlgorithm = this.stream.lookup(Packet.PUBLIC_KEY_ALGORITHMS);
 
-            if (this.publicKeyAlgorithmId === 1) {
+            if (this.publicKeyAlgorithm.id === 1) {
                 this.stream.multiPrecisionInteger();
             } else {
-                parseError("Unknown publicKeyAlgorithmId", this.publicKeyAlgorithmId);
+                parseError("Unknown publicKeyAlgorithm", this.publicKeyAlgorithm);
             }
 
         } else {
@@ -331,11 +294,10 @@ Packet.prototype = {
 
             var subpacket = {},
                 length = this.stream.variableLengthLength();
-            subpacket.subpacketTypeId = this.stream.octet();
-            subpacket.subpacketType = Packet.SIGNATURE_SUBPACKET_TYPES[subpacket.subpacketTypeId];
+            subpacket.subpacketType = this.stream.lookup(Packet.SIGNATURE_SUBPACKET_TYPES);
             var i;
 
-            switch (subpacket.subpacketTypeId) {
+            switch (subpacket.subpacketType.id) {
             case 2:
                 subpacket.creationTime = this.stream.time();
                 break;
@@ -380,7 +342,7 @@ Packet.prototype = {
 
             default:
                 subpacket.data = this.stream.hex(length - 1);
-                this.parseError('Unknown subpacketTypeId', subpacket.subpacketTypeId);
+                this.parseError('Unknown subpacketType', subpacket.subpacketType);
 
             }
             subpackets.push(subpacket);
@@ -392,54 +354,71 @@ Packet.prototype = {
         this.encryptedData = this.stream.hex(this.length);
     },
 
-    parseSecretKeyPacket: function () {
+    parsePublicKeyPacket: function () {
         this.version = this.stream.octet();
 
         if (this.version === 4) {
             this.createdAt = this.stream.time();
+            this.algorithm = this.stream.lookup(Packet.PUBLIC_KEY_ALGORITHMS);
 
-            this.algorithmId = this.stream.octet();
-            this.algorithm = Packet.PUBLIC_KEY_ALGORITHMS[this.algorithmId];
-            if (this.algorithmId === 1) {
-
+            if (this.algorithm.id === 1) {
                 this.n = this.stream.multiPrecisionInteger();
                 this.e = this.stream.multiPrecisionInteger();
-                this.stringToKeyConventions = this.stream.octet();
-
-                if (this.stringToKeyConventions === 254 || this.stringToKeyConventions === 255) {
-                    this.stringToKeyEncryptionId = this.stream.octet();
-                    this.stringToKeySpecifierId = this.stream.octet();
-
-                    if (this.stringToKeySpecifierId == 3) {
-                        this.stringToKeySpecifier = "Iterated and Salted S2K";
-
-                        this.stringToKeyHashId = this.stream.octet();
-                        this.stringToKeyHashSalt = this.stream.hex(8);
-                        this.stringToKeyIterationCount = this.stream.iterationCount();
-
-                    } else {
-
-                        this.paseError('Unknown stringToKeySpecifierId', this.stringToKeySpecifierId);
-                    }
-
-                } else if (this.stringToKeyConventions === 0) {
-                    this.d = this.stream.multiPrecisionInteger();
-                    this.p = this.stream.multiPrecisionInteger();
-                    this.q = this.stream.multiPrecisionInteger();
-                    this.u = this.stream.multiPrecisionInteger();
-
-                    this.checksum = this.stream.uint16();
-
-                } else {
-                    this.parseError("No support for old encrypted keys", this.stringToKeyConventions);
-                }
-
             } else {
-                this.parseError("Unkown algorithmId", this.algorithmId);
+                this.parseError("Unsupported algorithm", this.algorithm);
             }
 
         } else {
-            this.parseError("Unknown version", this.version);
+            this.parseError("Unsupported version", this.version);
+        }
+
+    },
+
+    parseSecretKeyPacket: function () {
+        this.parsePublicKeyPacket();
+
+        if (this.version === 4 && this.algorithm.id === 1) {
+
+            this.stringToKeyConventions = this.stream.octet();
+
+            if (this.stringToKeyConventions === 254 || this.stringToKeyConventions === 255) {
+                this.stringToKeyEncryption = this.stream.lookup(Packet.SYMMETRIC_KEY_ALGORITHMS);
+                this.stringToKeySpecifier = this.stream.lookup(Packet.STRING_TO_KEY_SPECIFIERS);
+
+                if (this.stringToKeySpecifier.id === 3) {
+                    this.stringToKeySpecifier = "Iterated and Salted S2K";
+
+                    this.stringToKeyHash = this.stream.lookup(Packet.HASH_ALGORITHMS);
+                    this.stringToKeyHashSalt = this.stream.hex(8);
+                    this.stringToKeyIterationCount = this.stream.iterationCount();
+
+                    if (this.stringToKeyEncryption.id === 3) {
+                        this.stringToKeyIV = this.stream.hex(16);
+
+                        // TODO: this doesn't seem long enough
+                        this.encryptedKey = this.stream.hex(this.stream.end - this.stream.pos);
+                    } else {
+                        this.parseError('Unknown encryption algorithm', this.stringToKeyEncryption);
+                    }
+
+
+
+                } else {
+
+                    this.parseError('Unknown stringToKeySpecifier', this.stringToKeySpecifier);
+                }
+
+            } else if (this.stringToKeyConventions === 0) {
+                this.d = this.stream.multiPrecisionInteger();
+                this.p = this.stream.multiPrecisionInteger();
+                this.q = this.stream.multiPrecisionInteger();
+                this.u = this.stream.multiPrecisionInteger();
+
+                this.checksum = this.stream.uint16();
+
+            } else {
+                this.parseError("No support for old encrypted keys", this.stringToKeyConventions);
+            }
         }
     },
 
@@ -480,7 +459,6 @@ Packet.prototype = {
         details.innerText = JSON.stringify(data, null, 4);
         body.appendChild(details);
         tr.appendChild(body);
-        console.log(tr.innerHTML);
         return tr;
     }
 };
@@ -502,7 +480,6 @@ function decode(text) {
         var packet = new Packet(stream);
         packet.parse();
         packets.push(packet);
-        console.log(packet);
     } while (stream.pos < stream.end);
 
     table.innerHTML = '';

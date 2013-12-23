@@ -61,7 +61,7 @@ Hex.decode = function(a) {
 };
 
 Hex.encode = function(a) {
-    if (isNaN(a)) {
+    if (typeof a === 'object') {
         return a.map(Hex.encode).join("");
     } else {
         if (a < 16) {
