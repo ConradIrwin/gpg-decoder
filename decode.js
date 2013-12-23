@@ -144,13 +144,99 @@ Packet.STRING_TO_KEY_SPECIFIERS = {
     3: "Iterated and Salted S2K"
 };
 
+
+
 Packet.prototype = {
+
     dump: function () {
         return Hex.encodePretty(this.stream.bytes.slice(this.start, this.end));
     },
+    coloredBytes: function () {
+        var output = "";
+        var n = 0;
+        this.stream.bytes.slice(this.start, this.end).map(function (b) {
+            return b < 16 ? "0" + b.toString(16) : b.toString(16);
+        }).forEach(function (b, i) {
+            output += "<span id='byte-" + (this.start + i) +"' style='font-weight: bold; padding-right: 10px; color: " + this.byteColors[this.start + i] + "'>" + b + "</span>";
+
+            if (++n % 16 === 0) {
+                output += "\n";
+            }
+
+        }.bind(this));
+        return output;
+    },
+    coloredData: function () {
+        var output = "";
+
+        Object.keys(this).forEach(function (key) {
+            if (this[key] && this[key].subpackets) {
+                this[key].forEach(function (subpacket) {
+                    Object.keys(subpacket).forEach(function (subkey) {
+                        var color = this.nameColors[subpacket.id + ":" + subkey];
+                        if (color) {
+                            output += "    <span onmouseover='hover(" + JSON.stringify(this.nameSpans[subpacket.id + ":" + subkey]) + ")' style='font-weight: bold; color: " + color + "'>" + subkey + "</span>:" + JSON.stringify(subpacket[subkey]) + "\n";
+                        }
+
+                    }.bind(this));
+                }.bind(this));
+            } else if (this.nameColors[key]) {
+                output += "  <span onmouseover='hover(" + JSON.stringify(this.nameSpans[key]) + ");' style='font-weight: bold; color: " + this.nameColors[key] + "'>" + key + "</span>:" +  JSON.stringify(this[key]) + "\n";
+            }
+        }.bind(this));
+        return output;
+
+    },
+    toJSON: function () {
+        var output = {};
+        for (var key in this) {
+            if (this.nameColors[key]) {
+                output[key] = this[key];
+            }
+        }
+        return output;
+    },
+    nextColor: function () {
+        var colors  = ['#f39c12', '#16a085',   '#d35400', '#8e44ad', '#27ae60', '#2c3e50', '#7f8c8d', '#c0392b'];
+
+        this.colorIndex = ((this.colorIndex || 0) + 1) % colors.length;
+        return colors[this.colorIndex];
+    },
+    nextSubpacket: function () {
+        this.subpacketId = (this.subpacketId || 0) + 1;
+        return {id: this.subpacketId};
+    },
+    set: function (name, value) {
+        if (!this.byteColors) {
+            this.byteColors = [];
+            this.nameColors = {};
+            this.nameSpans = {};
+        }
+
+        this.nameColors[name] = this.nextColor();
+        this.nameSpans[name] = [this.lastColorEnd || 0, this.stream.pos];
+
+        for (var i = (this.lastColorEnd || this.stream.start); i < this.stream.pos; i++) {
+            this.byteColors[i] = this.nameColors[name];
+        }
+        this.lastColorEnd = this.stream.pos;
+
+        this[name] = value;
+    },
+    setSubpacket: function (subpacket, name, value) {
+        this.nameColors[subpacket.id + ":" + name] = this.nextColor();
+        this.nameSpans[subpacket.id + ":" + name] = [this.lastColorEnd || 0, this.stream.pos];
+
+        for (var i = (this.lastColorEnd || this.stream.start); i < this.stream.pos; i++) {
+            this.byteColors[i] = this.nameColors[subpacket.id + ":" + name];
+        }
+        this.lastColorEnd = this.stream.pos;
+
+        subpacket[name] = value;
+    },
     parse: function () {
         this.start = this.stream.pos;
-        this.cipherTypeByte = this.stream.octet();
+        this.set('cipherTypeByte', this.stream.octet());
 
         if (!(this.cipherTypeByte & 0x80)) {
             alert('Invalid packet format');
@@ -180,19 +266,19 @@ Packet.prototype = {
 
         switch (size) {
         case 3: // 0-byte length
-            this.length = 0;
+            this.set('length', 0);
             break;
 
         case 2: // 4-byte length
-            this.length = this.stream.uint32();
+            this.set('length', this.stream.uint32());
 
             break;
         case 1: // 2-byte length
-            this.length = this.stream.uint16();
+            this.set('length', this.stream.uint16());
 
             break;
         case 0: // 1-byte length
-            this.length = this.stream.octet();
+            this.set('length', this.stream.octet());
         }
     },
 
@@ -201,7 +287,7 @@ Packet.prototype = {
     parseNewHeader: function () {
         this.tag = this.cipherTypeByte & 0x3f;
 
-        this.length = this.stream.variableLengthLength('support partial');
+        this.set('length', this.stream.variableLengthLength('support partial'));
     },
 
     parseBody: function () {
@@ -234,51 +320,51 @@ Packet.prototype = {
     },
 
     parsePublicKeyEncryptedSessionKey: function () {
-        this.version = this.stream.octet();
+        this.set('version', this.stream.octet());
 
         if (this.version === 3) {
-            this.keyId = this.stream.hex(8);
-            this.publicKeyAlgorithm = this.stream.lookup(Packet.PUBLIC_KEY_ALGORITHMS);
+            this.set('keyId', this.stream.hex(8));
+            this.set('publicKeyAlgorithm', this.stream.lookup(Packet.PUBLIC_KEY_ALGORITHMS));
 
             if (this.publicKeyAlgorithm.id === 1) {
-                this.stream.multiPrecisionInteger();
+                this.set('encryptedSessionKey', this.stream.multiPrecisionInteger());
             } else {
-                parseError("Unknown publicKeyAlgorithm", this.publicKeyAlgorithm);
+                this.parseError("Unknown publicKeyAlgorithm", this.publicKeyAlgorithm);
             }
 
         } else {
-            parseError("Unknown version", this.version);
+            this.parseError("Unknown version", this.version);
         }
     },
 
     parseUserIdPacket: function () {
-        this.userId = this.stream.utf8(this.length);
+        this.set('userId', this.stream.utf8(this.length));
     },
 
     parseSignaturePacket: function () {
-        this.version = this.stream.octet();
+        this.set('version', this.stream.octet());
         if (this.version === 4) {
 
-            this.signatureType = this.stream.lookup(Packet.SIGNATURE_TYPES);
-            this.publicKeyAlgorithm = this.stream.lookup(Packet.PUBLIC_KEY_ALGORITHMS);
-            this.hashAlgorithm = this.stream.lookup(Packet.HASH_ALGORITHMS);
+            this.set('signatureType', this.stream.lookup(Packet.SIGNATURE_TYPES));
+            this.set('publicKeyAlgorithm', this.stream.lookup(Packet.PUBLIC_KEY_ALGORITHMS));
+            this.set('hashAlgorithm', this.stream.lookup(Packet.HASH_ALGORITHMS));
 
-            this.hashedDataCount = this.stream.uint16();
+            this.set('hashedDataCount', this.stream.uint16());
             if (this.stream.subParse(this.hashedDataCount, function () {
                 this.hashedSubPackets = this.parseSignatureSubpackets();
             }.bind(this))) {
                 this.parseError("Unparsed hashed sub packet data");
             }
 
-            this.unhashedDataCount = this.stream.uint16();
+            this.set('unhashedDataCount', this.stream.uint16());
             if (this.stream.subParse(this.unhashedDataCount, function () {
                 this.unhashedSubPackets = this.parseSignatureSubpackets();
             }.bind(this))) {
                 this.parseError("Unparsed unhashed sub packet data");
             }
 
-            this.signedHashValuePrefix = this.stream.hex(2);
-            this.signature = this.stream.multiPrecisionInteger();
+            this.set('signedHashValuePrefix', this.stream.hex(2));
+            this.set('signature', this.stream.multiPrecisionInteger());
 
         } else {
             this.parseError('Unsupported version', this.version);
@@ -288,51 +374,53 @@ Packet.prototype = {
 
     parseSignatureSubpackets: function (subpackets) {
         subpackets = subpackets || [];
+        subpackets.subpackets = true;
         if (this.stream.pos >= this.stream.end) {
             return subpackets;
         } else {
 
-            var subpacket = {},
-                length = this.stream.variableLengthLength();
-            subpacket.subpacketType = this.stream.lookup(Packet.SIGNATURE_SUBPACKET_TYPES);
+            var subpacket = this.nextSubpacket();
+            this.setSubpacket(subpacket,'length', this.stream.variableLengthLength());
+
+            this.setSubpacket(subpacket, 'subpacketType', this.stream.lookup(Packet.SIGNATURE_SUBPACKET_TYPES));
             var i;
 
             switch (subpacket.subpacketType.id) {
             case 2:
-                subpacket.creationTime = this.stream.time();
+                this.setSubpacket(subpacket, 'creationTime', this.stream.time());
                 break;
 
             case 11:
-                subpacket.preferredSymmetricAlgorithms = this.stream.lookupArray(Packet.SYMMETRIC_KEY_ALGORITHMS, length - 1);
+                this.setSubpacket(subpacket, 'preferredSymmetricAlgorithms', this.stream.lookupArray(Packet.SYMMETRIC_KEY_ALGORITHMS, subpacket.length - 1));
                 break;
 
             case 16:
-                subpacket.keyId = this.stream.hex(8);
+                this.setSubpacket(subpacket, 'keyId', this.stream.hex(8));
                 break;
 
             case 21:
-                subpacket.preferredHashAlgorithms = this.stream.lookupArray(Packet.HASH_ALGORITHMS, length - 1);
+                this.setSubpacket(subpacket, 'preferredHashAlgorithms', this.stream.lookupArray(Packet.HASH_ALGORITHMS, subpacket.length - 1));
                 break;
 
             case 22:
-                subpacket.preferredCompressionAlgorithms = this.stream.lookupArray(Packet.COMPRESSION_ALGORITHMS, length - 1);
+                this.setSubpacket(subpacket, 'preferredCompressionAlgorithms', this.stream.lookupArray(Packet.COMPRESSION_ALGORITHMS, subpacket.length - 1));
                 break;
 
             case 23:
-                subpacket.keyServerPreferences = this.stream.lookupFlags(Packet.KEYSERVER_PREFERENCES, length - 1);
+                this.setSubpacket(subpacket, 'keyServerPreferences', this.stream.lookupFlags(Packet.KEYSERVER_PREFERENCES, subpacket.length - 1));
                 break;
 
             case 27:
-                subpacket.keyFlags = this.stream.lookupFlags(Packet.KEY_FLAGS, length - 1);
+                this.setSubpacket(subpacket, 'keyFlags', this.stream.lookupFlags(Packet.KEY_FLAGS, subpacket.length - 1));
                 break;
 
             case 30:
-                subpacket.keyFeatures = this.stream.lookupFlags(Packet.KEY_FEATURES, length - 1);
+                this.setSubpacket(subpacket, 'keyFeatures', this.stream.lookupFlags(Packet.KEY_FEATURES, subpacket.length - 1));
                 break;
 
             case 32:
-                if (this.stream.subParse(length - 1, function () {
-                    subpacket.subsignature =  new Packet(this.stream);
+                if (this.stream.subParse(subpacket.length - 1, function () {
+                    this.setSubpacket(subpacket, 'subsignature',  new Packet(this.stream));
                     subpacket.subsignature.parseSignaturePacket();
                     delete subpacket.subsignature.stream;
                 }.bind(this))) {
@@ -341,7 +429,7 @@ Packet.prototype = {
                 break;
 
             default:
-                subpacket.data = this.stream.hex(length - 1);
+                this.setSubpacket(subpacket, 'data', this.stream.hex(subpacket.length - 1));
                 this.parseError('Unknown subpacketType', subpacket.subpacketType);
 
             }
@@ -351,19 +439,19 @@ Packet.prototype = {
     },
 
     parseSymEncryptedIntegrityProtectedDataPacket: function () {
-        this.encryptedData = this.stream.hex(this.length);
+        this.set('encryptedData', this.stream.hex(this.length));
     },
 
     parsePublicKeyPacket: function () {
-        this.version = this.stream.octet();
+        this.set('version', this.stream.octet());
 
         if (this.version === 4) {
-            this.createdAt = this.stream.time();
-            this.algorithm = this.stream.lookup(Packet.PUBLIC_KEY_ALGORITHMS);
+            this.set('createdAt', this.stream.time());
+            this.set('algorithm', this.stream.lookup(Packet.PUBLIC_KEY_ALGORITHMS));
 
             if (this.algorithm.id === 1) {
-                this.n = this.stream.multiPrecisionInteger();
-                this.e = this.stream.multiPrecisionInteger();
+                this.set('n', this.stream.multiPrecisionInteger());
+                this.set('e', this.stream.multiPrecisionInteger());
             } else {
                 this.parseError("Unsupported algorithm", this.algorithm);
             }
@@ -379,24 +467,24 @@ Packet.prototype = {
 
         if (this.version === 4 && this.algorithm.id === 1) {
 
-            this.stringToKeyConventions = this.stream.octet();
+            this.set('stringToKeyConventions', this.stream.octet());
 
             if (this.stringToKeyConventions === 254 || this.stringToKeyConventions === 255) {
-                this.stringToKeyEncryption = this.stream.lookup(Packet.SYMMETRIC_KEY_ALGORITHMS);
-                this.stringToKeySpecifier = this.stream.lookup(Packet.STRING_TO_KEY_SPECIFIERS);
+                this.set('stringToKeyEncryption', this.stream.lookup(Packet.SYMMETRIC_KEY_ALGORITHMS));
+                this.set('stringToKeySpecifier', this.stream.lookup(Packet.STRING_TO_KEY_SPECIFIERS));
 
                 if (this.stringToKeySpecifier.id === 3) {
-                    this.stringToKeySpecifier = "Iterated and Salted S2K";
+                    this.set('stringToKeySpecifier', "Iterated and Salted S2K");
 
-                    this.stringToKeyHash = this.stream.lookup(Packet.HASH_ALGORITHMS);
-                    this.stringToKeyHashSalt = this.stream.hex(8);
-                    this.stringToKeyIterationCount = this.stream.iterationCount();
+                    this.set('stringToKeyHash', this.stream.lookup(Packet.HASH_ALGORITHMS));
+                    this.set('stringToKeyHashSalt', this.stream.hex(8));
+                    this.set('stringToKeyIterationCount', this.stream.iterationCount());
 
                     if (this.stringToKeyEncryption.id === 3) {
-                        this.stringToKeyIV = this.stream.hex(16);
+                        this.set('stringToKeyIV', this.stream.hex(16));
 
                         // TODO: this doesn't seem long enough
-                        this.encryptedKey = this.stream.hex(this.stream.end - this.stream.pos);
+                        this.set('encryptedKey', this.stream.hex(this.stream.end - this.stream.pos));
                     } else {
                         this.parseError('Unknown encryption algorithm', this.stringToKeyEncryption);
                     }
@@ -409,12 +497,12 @@ Packet.prototype = {
                 }
 
             } else if (this.stringToKeyConventions === 0) {
-                this.d = this.stream.multiPrecisionInteger();
-                this.p = this.stream.multiPrecisionInteger();
-                this.q = this.stream.multiPrecisionInteger();
-                this.u = this.stream.multiPrecisionInteger();
+                this.set('d', this.stream.multiPrecisionInteger());
+                this.set('p', this.stream.multiPrecisionInteger());
+                this.set('q', this.stream.multiPrecisionInteger());
+                this.set('u', this.stream.multiPrecisionInteger());
 
-                this.checksum = this.stream.uint16();
+                this.set('checksum', this.stream.uint16());
 
             } else {
                 this.parseError("No support for old encrypted keys", this.stringToKeyConventions);
@@ -436,7 +524,7 @@ Packet.prototype = {
         var tr = document.createElement('tr');
         var head = document.createElement('td');
         tr.appendChild(head);
-        head.innerHTML = '<pre>' + this.dump() + '</pre>';
+        head.innerHTML = '<pre>' + this.coloredBytes() + '</pre>';
         var body = document.createElement('td');
         var title = document.createElement('h3');
         if (this.parseErrors) {
@@ -447,16 +535,7 @@ Packet.prototype = {
         var details = document.createElement('pre');
 
         var data = {};
-        for (var key in this) {
-            if (key === 'stream' || key === 'start' || key === 'end' || key == 'packet') {
-                continue;
-            }
-            if (!this.hasOwnProperty(key)) {
-                continue;
-            }
-            data[key] = this[key];
-        }
-        details.innerText = JSON.stringify(data, null, 4);
+        details.innerHTML = this.coloredData();
         body.appendChild(details);
         tr.appendChild(body);
         return tr;
@@ -486,4 +565,19 @@ function decode(text) {
     packets.forEach(function (packet) {
         table.appendChild(packet.toDOM());
     });
+}
+
+function hover(spans) {
+
+    var toClean = document.getElementsByClassName('hovered');
+    while (toClean[0]) {
+        toClean[0].style.backgroundColor = '';
+        toClean[0].className = '';
+    }
+
+    for (i = spans[0]; i < spans[1]; i++) {
+        var span = document.getElementById('byte-' + i);
+        span.className = 'hovered';
+        span.style.backgroundColor = '#CCC';
+    }
 }
