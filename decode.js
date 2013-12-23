@@ -448,7 +448,7 @@ Packet.prototype = {
 
         var data = {};
         for (var key in this) {
-            if (key === 'stream' || key === 'start' || key === 'end' || key === 'begin' || key === 'length') {
+            if (key === 'stream' || key === 'start' || key === 'end' || key == 'packet') {
                 continue;
             }
             if (!this.hasOwnProperty(key)) {
