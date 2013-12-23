@@ -171,6 +171,7 @@ Packet.prototype = {
 
         Object.keys(this).forEach(function (key) {
             if (this[key] && this[key].subpackets) {
+                output += "  subpackets:\n";
                 this[key].forEach(function (subpacket) {
                     Object.keys(subpacket).forEach(function (subkey) {
                         var color = this.nameColors[subpacket.id + ":" + subkey];
@@ -249,7 +250,7 @@ Packet.prototype = {
         }
 
         if (this.stream.subParse(this.length, function () {
-            this.packet = Packet.TAGS[this.tag];
+            this.packet = new LookupResult(Packet.TAGS[this.tag], this.tag);
             this.parseBody();
         }.bind(this))) {
             this.parseError("unparsed data!");
