@@ -3,6 +3,8 @@ function Stream(bytes, start, end) {
     this.start = start || 0;
     this.end = end || bytes.length;
 
+    this.lengthHeaders = [];
+
     this.pos = this.start;
 }
 
@@ -21,6 +23,10 @@ Stream.prototype = {
         if (this.pos >= this.end) {
             return NaN;
         } else {
+            while (this.pos === this.lengthHeaders[0]) {
+                this.pos += 1;
+                this.lengthHeaders.shift();
+            }
             return this.bytes[this.pos++];
         }
     },
@@ -77,22 +83,47 @@ Stream.prototype = {
     },
 
     // RFC 4880 4.2.2, 5.2.3.1
-    variableLengthLength: function (supportPartial) {
+    variableLengthLength: function (supportPartial, mark) {
         var length = this.octet();
+        if (mark) {
+            this.lengthHeaders.push(this.pos - 1);
+        }
+
 
         if (length < 192) {
             return length;
         }
 
         if (length < (supportPartial ? 224 : 255)) {
-            return ((length - 192) << 8) +  this.octet() + 192;
+            length = ((length - 192) << 8) +  this.octet() + 192;
+            if (mark) {
+                this.lengthHeaders.push(this.pos - 1);
+            }
+            return length;
         }
 
+        // partial lengths...
         if (length < 255) {
-            alert('partial lengths not supported');
+            var next = 1 << (length & 0x1f),
+                currentPos = this.pos;
+
+            this.pos += next + 1;
+
+            var nextJump = this.variableLengthLength(supportPartial, 'mark');
+
+            this.pos = currentPos;
+
+            return next + nextJump;
         }
 
-        return this.uint32();
+        length = this.uint32();
+        if (mark) {
+            this.lengthHeaders.push(this.pos - 1);
+            this.lengthHeaders.push(this.pos - 2);
+            this.lengthHeaders.push(this.pos - 3);
+            this.lengthHeaders.push(this.pos - 4);
+        }
+        return length;
     },
 
     subParse: function (n, f) {

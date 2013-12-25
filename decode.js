@@ -324,7 +324,7 @@ Packet.prototype = {
         this.set('version', this.stream.octet());
 
         if (this.version === 3) {
-            this.set('keyId', this.stream.hex(8));
+            this.set('keyId', this.stream.hex(8).toUpperCase());
             this.set('publicKeyAlgorithm', this.stream.lookup(Packet.PUBLIC_KEY_ALGORITHMS));
 
             if (this.publicKeyAlgorithm.id === 1) {
@@ -550,6 +550,7 @@ function decode(text) {
     text = text.split("\n\n")[1].split("\n=")[0].replace(/\n/g, "");
 
     var bytes = Base64.decode(text);
+    window.bytes = bytes;
     window.packets = window.packets || [];
     var i = 0;
     var table = document.getElementsByTagName('tbody')[0];

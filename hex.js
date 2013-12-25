@@ -66,8 +66,10 @@ Hex.encode = function(a) {
     } else {
         if (a < 16) {
             return "0" + a.toString(16);
-        } else {
+        } else if (a) {
             return a.toString(16);
+        } else {
+            return "";
         }
     }
 };
