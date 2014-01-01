@@ -1,6 +1,6 @@
 An in-browser decoder for [RFC 4880](https://tools.ietf.org/search/rfc4880) (aka PGP/GPG messages).
 
-It doesn't decrypt anything, but it is useful for debugging the (rather obscure) packet format used by GnnPG and other PGP apps.
+It doesn't decrypt anything, but it is useful for debugging the (rather obscure) packet format used by GnuPG and other PGP apps.
 
 ![screen shot](http://cirw.in/gpg-decoder/screenshot.png)
 
