@@ -552,7 +552,7 @@ function decode(text) {
 
     var bytes = Base64.decode(text);
     window.bytes = bytes;
-    window.packets = window.packets || [];
+    window.packets = [];
     var i = 0;
     var table = document.getElementsByTagName('tbody')[0];
 
