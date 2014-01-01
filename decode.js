@@ -440,6 +440,7 @@ Packet.prototype = {
     },
 
     parseSymEncryptedIntegrityProtectedDataPacket: function () {
+        this.set('version', this.stream.octet());
         this.set('encryptedData', this.stream.hex(this.length));
     },
 
