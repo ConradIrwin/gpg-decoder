@@ -2,9 +2,29 @@
 <script src="hex.js"></script>
 <script src="stream.js"></script>
 <script src="decode.js"></script>
-<style>* { font-family: monospace; }</style>
+<style>
+table { font-family: monospace; }
+textarea { font-family: monospace; padding: 1rem; }
+body, table { width: 100%; box-sizing: border-box; margin: 0; border: 10px solid white; }
+pre { white-space: pre-wrap; }
+.hovered { background: #CCC; }
+.bytes span { font-weight: bold; padding-left: 10px; }
+td { vertical-align: top; padding: 0.5em; }
+.details { word-break: break-word; }
+p { margin: 0.75em; max-width: 800px }
+</style>
 
-<textarea rows="30" cols="70">
+<h1>GPG/PGP Decoder</h1>
+
+<p>This page will decode PGP armored messages in javascript. It's intended to help you debug if you happen to be working with <a href="https://tools.ietf.org/html/rfc4880">RFC 4880</a> encoded messages. It was inspired by (and shares code from) the awesome <a href="http://lapo.it/asn1js/">ASN.1 decoder</a>.</p>
+
+<p>To use it, just paste a GPG message in the box below and click Decode. On the left of the page you'll see the actual bytes, and on the right of the page is the assigned meaning.</p>
+
+
+<p style="margin-left: 5em; margin-bottom: 1.5em;">— <a href="https://twitter.com/ConradIrwin">@ConradIrwin</a> (<a href="https://github.com/ConradIrwin/gpg-decoder">source code</a>)</p>
+
+  <p>
+        <textarea rows="25" cols="62" spellcheck=false>
 -----BEGIN PGP MESSAGE-----
 Version: GnuPG v1.4.15 (Darwin)
 
@@ -30,12 +50,16 @@ hNEMsAegGoBRdTsYbAEHzoTQkZpgo5mFGXa/vmPUqkTKR1ixl0pC2Uq/KASAaQNx
 ibU7sg==
 =HprM
 -----END PGP MESSAGE-----
-</textarea>
+        </textarea>
+          <input type="submit" value="Decode" style="display: block" onclick="decode(document.getElementsByTagName('textarea')[0].value); return false">
 
-<input type="submit" onclick="decode(document.getElementsByTagName('textarea')[0].value); return false">
+          </p>
+
 
 <table>
-  <tr><td></td></tr>
+  <tbody>
+    <tr><td></td></tr>
+  </tbody>
 </table>
 
 <script>

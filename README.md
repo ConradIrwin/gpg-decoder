@@ -1,9 +1,23 @@
+An in-browser decoder for [RFC 4880](https://tools.ietf.org/search/rfc4880) (aka PGP/GPG messages).
 
-Abandonware!
-------------
+It doesn't decrypt anything, but it is useful for debugging the (rather obscure) packet format used by GnnPG and other PGP apps.
 
-This was my aborted attempt to clone the awesome [ASN1 decoder](http://lapo.it/asn1js/) tool, but for GPG messages as defined in[RFC 4880](http://tools.ietf.org/search/rfc4880).
+![screen shot](http://cirw.in/gpg-decoder/screenshot.png)
 
-I started the project because I wanted to understand the format of the messages produced by GPG as used in [dotgpg](https://github.com/ConradIrwin/dotgpg), and then abandoned it because I felt I had a good enough understanding, and there are a huge number of details to code up (though [OpenPGP.js](http://openpgpjs.org/) has probably already done most of the work).
+## Usage
 
-Most of the packets also contain interesting data behind a layer of encryption, so making a good tool would probably require decrypting encrypted blobs. But a pretty reasonable tool could be built without much difficulty from what's here.
+I'd recommend you use the version on my site at [http://cirw.in/gpg-decoder/](http://cirw.in/gpg-decoder), but if you're debugging sensitive stuff and are really paranoid you might want to run it on a friendly web-server of your own.
+
+## Todo
+
+There's a lot of RFC 4880, I mostly just implemented the bits I needed at the time. If you need anything added, please send a pull request :).
+
+## Thanks
+
+Massive thanks to [Lapo Luchini](http://lapo.it) for his work on the [ASN.1 Javascript decoder](http://lapo.it/asn1js/).
+
+## License
+
+Unless otherwise specified the code is Copyright 2013 Conrad Irwin (see LICENSE.MIT) for details.
+
+Most of `hex.js` is Copyright 2008-2013 Lapo Luchini, see the header in that file for details. 

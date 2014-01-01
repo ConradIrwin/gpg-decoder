@@ -157,7 +157,7 @@ Packet.prototype = {
         this.stream.bytes.slice(this.start, this.end).map(function (b) {
             return b < 16 ? "0" + b.toString(16) : b.toString(16);
         }).forEach(function (b, i) {
-            output += "<span id='byte-" + (this.start + i) +"' style='font-weight: bold; padding-right: 10px; color: " + this.byteColors[this.start + i] + "'>" + b + "</span>";
+            output += "<span id='byte-" + (this.start + i) +"' style='color: " + this.byteColors[this.start + i] + "'>" + b + "</span>";
 
             if (++n % 16 === 0) {
                 output += "\n";
@@ -182,7 +182,7 @@ Packet.prototype = {
                     }.bind(this));
                 }.bind(this));
             } else if (this.nameColors[key]) {
-                output += "  <span onmouseover='hover(" + JSON.stringify(this.nameSpans[key]) + ");' style='font-weight: bold; color: " + this.nameColors[key] + "'>" + key + "</span>:" +  JSON.stringify(this[key]) + "\n";
+                output += "  <span onmouseover='hover(" + JSON.stringify(this.nameSpans[key]) + ");' style='font-weight: bold; color: " + this.nameColors[key] + "'>" + key + "</span>: " +  JSON.stringify(this[key]) + "\n";
             }
         }.bind(this));
         return output;
@@ -526,7 +526,7 @@ Packet.prototype = {
         var tr = document.createElement('tr');
         var head = document.createElement('td');
         tr.appendChild(head);
-        head.innerHTML = '<pre>' + this.coloredBytes() + '</pre>';
+        head.innerHTML = '<pre class="bytes">' + this.coloredBytes() + '</pre>';
         var body = document.createElement('td');
         var title = document.createElement('h3');
         if (this.parseErrors) {
@@ -535,6 +535,7 @@ Packet.prototype = {
         title.innerText = this.packet;
         body.appendChild(title);
         var details = document.createElement('pre');
+        details.className = 'details';
 
         var data = {};
         details.innerHTML = this.coloredData();
@@ -574,13 +575,11 @@ function hover(spans) {
 
     var toClean = document.getElementsByClassName('hovered');
     while (toClean[0]) {
-        toClean[0].style.backgroundColor = '';
         toClean[0].className = '';
     }
 
     for (i = spans[0]; i < spans[1]; i++) {
         var span = document.getElementById('byte-' + i);
         span.className = 'hovered';
-        span.style.backgroundColor = '#CCC';
     }
 }
