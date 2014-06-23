@@ -176,13 +176,13 @@ Packet.prototype = {
                     Object.keys(subpacket).forEach(function (subkey) {
                         var color = this.nameColors[subpacket.id + ":" + subkey];
                         if (color) {
-                            output += "    <span onmouseover='hover(" + JSON.stringify(this.nameSpans[subpacket.id + ":" + subkey]) + ")' style='font-weight: bold; color: " + color + "'>" + subkey + "</span>:" + JSON.stringify(subpacket[subkey]) + "\n";
+                            output += "    <span onmouseover='hover(" + JSON.stringify(this.nameSpans[subpacket.id + ":" + subkey]) + ")' style='font-weight: bold; color: " + color + "'>" + subkey + "</span>:" + JSON.stringify(("" + subpacket[subkey]).replace('<', '&lt;')) + "\n";
                         }
 
                     }.bind(this));
                 }.bind(this));
             } else if (this.nameColors[key]) {
-                output += "  <span onmouseover='hover(" + JSON.stringify(this.nameSpans[key]) + ");' style='font-weight: bold; color: " + this.nameColors[key] + "'>" + key + "</span>: " +  JSON.stringify(this[key]) + "\n";
+                output += "  <span onmouseover='hover(" + JSON.stringify(this.nameSpans[key]) + ");' style='font-weight: bold; color: " + this.nameColors[key] + "'>" + key + "</span>: " +  JSON.stringify(("" + this[key]).replace('<', '&lt;')) + "\n";
             }
         }.bind(this));
         return output;
