@@ -117,6 +117,8 @@ Packet.SIGNATURE_SUBPACKET_TYPES = {
     30: "Features",
     31: "Signature Target",
     32: "Embedded Signature",
+    33: "Issuer Fingerprint",
+    34: "Preferred AEAD Algorithms",
 };
 
 Packet.KEYSERVER_PREFERENCES = {
