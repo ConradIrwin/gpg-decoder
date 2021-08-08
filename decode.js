@@ -369,6 +369,19 @@ Packet.prototype = {
             this.set('signedHashValuePrefix', this.stream.hex(2));
             this.set('signature', this.stream.multiPrecisionInteger());
 
+        } else if (this.version === 3) {
+            this.set('hashLength', this.stream.octet());
+            if (this.hashLength != 5) {
+                this.parseError("Incorrect hash length", this.hashLength);
+            } else {
+                this.set('signatureType', this.stream.lookup(Packet.SIGNATURE_TYPES));
+                this.set('creationTime', this.stream.time());
+                this.set('keyId', this.stream.hex(8).toUpperCase());
+                this.set('publicKeyAlgorithm', this.stream.lookup(Packet.PUBLIC_KEY_ALGORITHMS));
+                this.set('hashAlgorithm', this.stream.lookup(Packet.HASH_ALGORITHMS));
+                this.set('signedHashValuePrefix', this.stream.hex(2));
+                this.set('signature', this.stream.multiPrecisionInteger());
+            }
         } else {
             this.parseError('Unsupported version', this.version);
 
@@ -449,8 +462,12 @@ Packet.prototype = {
     parsePublicKeyPacket: function () {
         this.set('version', this.stream.octet());
 
-        if (this.version === 4) {
+        if (this.version === 4 || this.version === 3) {
             this.set('createdAt', this.stream.time());
+            if (this.version === 3) {
+                this.set('validDays', this.stream.uint16());
+            }
+
             this.set('algorithm', this.stream.lookup(Packet.PUBLIC_KEY_ALGORITHMS));
 
             if (this.algorithm.id === 1) {
@@ -469,7 +486,7 @@ Packet.prototype = {
     parseSecretKeyPacket: function () {
         this.parsePublicKeyPacket();
 
-        if (this.version === 4 && this.algorithm.id === 1) {
+        if ((this.version === 4 || this.version === 3) && this.algorithm.id === 1) {
 
             this.set('stringToKeyConventions', this.stream.octet());
 
@@ -509,7 +526,8 @@ Packet.prototype = {
                 this.set('checksum', this.stream.uint16());
 
             } else {
-                this.parseError("No support for old encrypted keys", this.stringToKeyConventions);
+                this.set('stringToKeyEncryption', new LookupResult(Packet.SYMMETRIC_KEY_ALGORITHMS[this.stringToKeyConventions], this.stringToKeyConventions));
+                this.set('encryptedKey', this.stream.hex(this.stream.end - this.stream.pos));
             }
         }
     },
