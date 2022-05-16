@@ -33,6 +33,7 @@ Packet.PUBLIC_KEY_ALGORITHMS = {
     19: "Reserved for ECDSA",
     20: "Reserved (formerly Elgamal Encrypt or Sign)",
     21: "Reserved for Diffie-Hellman (X9.42, as defined for IETF-S/MIME)",
+    22: "Ed25519 (Encrypt or Sign)",
 };
 
 Packet.SYMMETRIC_KEY_ALGORITHMS = {
