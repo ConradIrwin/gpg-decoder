@@ -368,7 +368,12 @@ Packet.prototype = {
             }
 
             this.set('signedHashValuePrefix', this.stream.hex(2));
-            this.set('signature', this.stream.multiPrecisionInteger());
+            if (this.publicKeyAlgorithm.id === 0x16) {
+              this.set('signatureR', this.stream.multiPrecisionInteger());
+              this.set('signatureS', this.stream.multiPrecisionInteger());
+            } else {
+              this.set('signature', this.stream.multiPrecisionInteger());
+            }
 
         } else if (this.version === 3) {
             this.set('hashLength', this.stream.octet());
@@ -443,6 +448,11 @@ Packet.prototype = {
                 }.bind(this))) {
                     this.parseError("Unhanded sub-signature data");
                 }
+                break;
+
+              case 33:
+                this.setSubpacket(subpacket, 'issuerFingerprintVersion', this.stream.hex(1))
+                this.setSubpacket(subpacket, 'issuerFingerprint', this.stream.hex(subpacket.length - 2))
                 break;
 
             default:
@@ -567,16 +577,15 @@ Packet.prototype = {
 };
 
 function decode(text) {
+    var table = document.getElementsByTagName('tbody')[0];
+    table.innerHTML = '';
 
-    this.location.hash = text;
+    this.location.hash = encodeURIComponent(text);
 
-    text = text.split("\n\n")[1].split("\n=")[0].replace(/\n/g, "");
-
-    var bytes = Base64.decode(text);
+    var bytes = Base64.unarmor(text);
     window.bytes = bytes;
     window.packets = [];
     var i = 0;
-    var table = document.getElementsByTagName('tbody')[0];
 
     var stream = new Stream(bytes);
 
@@ -586,7 +595,6 @@ function decode(text) {
         packets.push(packet);
     } while (stream.pos < stream.end);
 
-    table.innerHTML = '';
     packets.forEach(function (packet) {
         table.appendChild(packet.toDOM());
     });

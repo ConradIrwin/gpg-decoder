@@ -66,7 +66,7 @@ ibU7sg==
 
 <script>
   if (this.location.hash.length > 1) {
-      document.getElementsByTagName('textarea')[0].value = unescape(this.location.hash.substr(1));
+      document.getElementsByTagName('textarea')[0].value = decodeURIComponent(this.location.hash.substr(1));
       decode(document.getElementsByTagName('textarea')[0].value);
     }
 </script>
