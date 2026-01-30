@@ -6,11 +6,14 @@ function Stream(bytes, start, end) {
     this.lengthHeaders = [];
 
     this.pos = this.start;
+
+    this.remaining = function() { return this.end - this.pos; }
 }
 
-function LookupResult(string, id) {
+function LookupResult(string, id, critical = false, raw = id) {
     this.toString = this.toJSON = function () {
-        return (string || "undefined") + " (0x" + id.toString(16) + ")";
+        var critstr = (critical ? "* (critical: 0x" + raw.toString(16) + ")" : "");
+        return (string || "undefined") + " (0x" + id.toString(16) + ")" + critstr;
     };
     this.id = id;
 }
@@ -52,7 +55,10 @@ Stream.prototype = {
     },
 
     time: function () {
-        return new Date(this.uint32() * 1000);
+        var timestamp = this.uint32();
+        return timestamp > 0
+            ? new Date(timestamp * 1000)
+            : "never";
     },
 
     hex: function (n) {
@@ -146,6 +152,14 @@ Stream.prototype = {
     lookup: function (table) {
         var octet = this.octet();
         return new LookupResult(table[octet], octet);
+    },
+
+    lookupCritical: function(table) {
+        var raw = this.octet();
+        var critical = (raw & 0x80) ? true : false;
+        var normalized = raw & ~(0x80);
+
+        return new LookupResult(table[normalized], normalized, critical, raw);
     },
 
     lookupArray: function (table, n) {
